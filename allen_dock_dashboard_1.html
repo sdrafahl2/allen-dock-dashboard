@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Allen Dock Research Station — Live Environmental Monitor</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── WORDPRESS BREAKOUT ── */
+  #allen-dock-wrapper {
+    position: relative;
+    width: 100vw;
+    left: 50%;
+    right: 50%;
+    margin-left: -50vw;
+    margin-right: -50vw;
+    overflow-x: hidden;
+  }
+  :root {
+    --bg-void: #050810;
+    --bg-deep: #080d1a;
+    --bg-panel: #0d1526;
+    --bg-card: #111c33;
+    --bg-highlight: #162040;
+    --border: rgba(56, 130, 220, 0.18);
+    --border-bright: rgba(56, 180, 255, 0.4);
+    --accent-cyan: #38b4ff;
+    --accent-teal: #00e5cc;
+    --accent-amber: #f5a623;
+    --accent-coral: #ff6b6b;
+    --accent-green: #4ade80;
+    --text-primary: #e8f0ff;
+    --text-secondary: #7a9cc4;
+    --text-muted: #3d5475;
+    --glow-cyan: 0 0 20px rgba(56, 180, 255, 0.3);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg-void);
+    color: var(--text-primary);
+    font-family: 'Barlow', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(56,130,220,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(56,130,220,0.04) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    top: -40%; left: -20%;
+    width: 80%; height: 80%;
+    background: radial-gradient(ellipse, rgba(0,60,120,0.25) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+    animation: driftGlow 18s ease-in-out infinite alternate;
+  }
+
+  @keyframes driftGlow {
+    0% { transform: translate(0,0) scale(1); }
+    100% { transform: translate(8%,5%) scale(1.1); }
+  }
+
+  header {
+    position: relative; z-index: 10;
+    padding: 0 40px;
+    background: linear-gradient(180deg, rgba(5,8,16,0.98) 0%, rgba(5,8,16,0.85) 100%);
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(10px);
+  }
+
+  .header-inner {
+    max-width: 1400px; margin: 0 auto;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 0;
+  }
+
+  .station-identity { display: flex; align-items: center; gap: 18px; }
+
+  .station-icon { width: 48px; height: 48px; flex-shrink: 0; }
+  .station-icon svg { width: 100%; height: 100%; }
+
+  .station-name h1 {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700; font-size: 1.5rem;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--text-primary); line-height: 1.1;
+  }
+
+  .station-name span {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem; color: var(--accent-cyan);
+    letter-spacing: 0.15em; text-transform: uppercase;
+  }
+
+  .header-meta { display: flex; align-items: center; gap: 24px; }
+
+  .live-indicator {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 14px;
+    background: rgba(74,222,128,0.08);
+    border: 1px solid rgba(74,222,128,0.25);
+    border-radius: 2px;
+  }
+
+  .live-dot {
+    width: 7px; height: 7px;
+    background: var(--accent-green); border-radius: 50%;
+    animation: livePulse 2s ease-in-out infinite;
+  }
+
+  @keyframes livePulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--accent-green); }
+    50% { opacity: 0.4; box-shadow: none; }
+  }
+
+  .live-indicator span {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem; color: var(--accent-green);
+    letter-spacing: 0.12em; text-transform: uppercase;
+  }
+
+  .header-timestamp {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem; color: var(--text-muted); letter-spacing: 0.08em;
+  }
+
+  .stat-bar {
+    position: relative; z-index: 10;
+    background: var(--bg-deep);
+    border-bottom: 1px solid var(--border);
+    padding: 0 40px;
+  }
+
+  .stat-bar-inner {
+    max-width: 1400px; margin: 0 auto;
+    display: flex; align-items: stretch;
+  }
+
+  .stat-item {
+    flex: 1; display: flex; align-items: center; gap: 14px;
+    padding: 14px 20px; border-right: 1px solid var(--border);
+    transition: background 0.2s;
+  }
+
+  .stat-item:last-child { border-right: none; }
+  .stat-item:hover { background: rgba(56,130,220,0.04); }
+  .stat-icon { font-size: 1.3rem; opacity: 0.85; }
+
+  .stat-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.58rem; color: var(--text-muted);
+    letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 2px;
+  }
+
+  .stat-value {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600; font-size: 1.3rem; letter-spacing: 0.02em; line-height: 1;
+  }
+
+  .stat-unit { font-size: 0.65rem; color: var(--text-secondary); font-weight: 300; margin-left: 2px; }
+
+  .stat-delta { font-family: 'Space Mono', monospace; font-size: 0.6rem; margin-top: 3px; }
+  .stat-delta.up { color: var(--accent-coral); }
+  .stat-delta.down { color: var(--accent-cyan); }
+  .stat-delta.neutral { color: var(--text-muted); }
+
+  .tab-nav {
+    position: relative; z-index: 10;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    padding: 0 40px;
+  }
+
+  .tab-nav-inner {
+    max-width: 1400px; margin: 0 auto;
+    display: flex; align-items: stretch;
+  }
+
+  .tab-btn {
+    position: relative; padding: 16px 32px;
+    background: none; border: none; border-right: 1px solid var(--border);
+    cursor: pointer;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600; font-size: 0.85rem;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--text-muted); transition: all 0.25s;
+    display: flex; align-items: center; gap: 10px;
+  }
+
+  .tab-btn:hover { color: var(--text-secondary); background: rgba(56,130,220,0.04); }
+  .tab-btn.active { color: var(--accent-cyan); background: rgba(56,180,255,0.06); }
+
+  .tab-btn.active::after {
+    content: ''; position: absolute;
+    bottom: -1px; left: 0; right: 0; height: 2px;
+    background: var(--accent-cyan); box-shadow: var(--glow-cyan);
+  }
+
+  .tab-badge {
+    font-family: 'Space Mono', monospace; font-size: 0.55rem;
+    padding: 2px 6px;
+    background: rgba(56,180,255,0.12); border: 1px solid rgba(56,180,255,0.25);
+    border-radius: 2px; color: var(--accent-cyan); letter-spacing: 0.08em;
+  }
+
+  .tab-badge.new {
+    background: rgba(245,166,35,0.12); border-color: rgba(245,166,35,0.25);
+    color: var(--accent-amber);
+  }
+
+  .filter-bar {
+    position: relative; z-index: 10;
+    background: var(--bg-deep);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 40px;
+  }
+
+  .filter-bar-inner {
+    max-width: 1400px; margin: 0 auto;
+    display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+  }
+
+  .filter-label {
+    font-family: 'Space Mono', monospace; font-size: 0.6rem;
+    color: var(--text-muted); letter-spacing: 0.12em; text-transform: uppercase;
+  }
+
+  .filter-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .chip {
+    padding: 5px 14px; border-radius: 2px;
+    font-family: 'Space Mono', monospace; font-size: 0.6rem;
+    letter-spacing: 0.08em; cursor: pointer;
+    border: 1px solid var(--border); background: none;
+    color: var(--text-muted); transition: all 0.2s; text-transform: uppercase;
+  }
+
+  .chip:hover { border-color: var(--border-bright); color: var(--text-secondary); }
+  .chip.active { background: rgba(56,180,255,0.1); border-color: var(--accent-cyan); color: var(--accent-cyan); }
+
+  .filter-sep { width: 1px; height: 20px; background: var(--border); }
+
+  .date-range-input {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 12px; border: 1px solid var(--border);
+    background: rgba(13,21,38,0.8);
+    font-family: 'Space Mono', monospace; font-size: 0.6rem;
+    color: var(--text-secondary); letter-spacing: 0.06em;
+  }
+
+  .scrollable-main { position: relative; z-index: 5; }
+
+  .main-content {
+    position: relative; z-index: 5;
+    max-width: 1400px; margin: 0 auto;
+    padding: 28px 40px 60px;
+  }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .section-label {
+    font-family: 'Space Mono', monospace; font-size: 0.6rem;
+    color: var(--text-muted); letter-spacing: 0.15em; text-transform: uppercase;
+    margin-bottom: 16px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 16px;
+  }
+
+  .col-8 { grid-column: span 8; }
+  .col-6 { grid-column: span 6; }
+  .col-4 { grid-column: span 4; }
+  .col-3 { grid-column: span 3; }
+  .col-12 { grid-column: span 12; }
+
+  .viz-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    position: relative; overflow: hidden;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    animation: fadeUp 0.4s ease forwards; opacity: 0;
+  }
+
+  .viz-card:nth-child(1) { animation-delay: 0.05s; }
+  .viz-card:nth-child(2) { animation-delay: 0.10s; }
+  .viz-card:nth-child(3) { animation-delay: 0.15s; }
+  .viz-card:nth-child(4) { animation-delay: 0.20s; }
+  .viz-card:nth-child(5) { animation-delay: 0.25s; }
+  .viz-card:nth-child(6) { animation-delay: 0.30s; }
+  .viz-card:nth-child(7) { animation-delay: 0.35s; }
+  .viz-card:nth-child(8) { animation-delay: 0.40s; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .viz-card:hover { border-color: var(--border-bright); box-shadow: 0 0 30px rgba(56,130,220,0.1); }
+
+  .viz-card::before {
+    content: ''; position: absolute;
+    top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+    opacity: 0; transition: opacity 0.3s;
+  }
+
+  .viz-card:hover::before { opacity: 0.6; }
+
+  .card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px 10px; border-bottom: 1px solid var(--border);
+  }
+
+  .card-title {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 600;
+    font-size: 0.78rem; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+
+  .card-subtitle {
+    font-family: 'Space Mono', monospace; font-size: 0.55rem;
+    color: var(--text-muted); letter-spacing: 0.08em; margin-top: 2px;
+  }
+
+  .card-actions { display: flex; gap: 8px; align-items: center; }
+
+  .card-tag {
+    font-family: 'Space Mono', monospace; font-size: 0.52rem;
+    padding: 2px 8px; border: 1px solid; letter-spacing: 0.1em; text-transform: uppercase;
+  }
+
+  .tag-temp { border-color: rgba(255,107,107,0.4); color: var(--accent-coral); }
+  .tag-wind { border-color: rgba(56,180,255,0.4); color: var(--accent-cyan); }
+  .tag-solar { border-color: rgba(245,166,35,0.4); color: var(--accent-amber); }
+  .tag-humid { border-color: rgba(0,229,204,0.4); color: var(--accent-teal); }
+  .tag-pressure { border-color: rgba(74,222,128,0.4); color: var(--accent-green); }
+  .tag-precip { border-color: rgba(56,180,255,0.3); color: #7dd3fc; }
+  .tag-co2 { border-color: rgba(167,139,250,0.4); color: #a78bfa; }
+  .tag-wb { border-color: rgba(251,191,36,0.4); color: #fbbf24; }
+
+  .card-body { padding: 12px 18px 16px; }
+
+  .chart-stat-row { display: flex; gap: 24px; margin-bottom: 12px; flex-wrap: wrap; }
+
+  .chart-stat-val {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700; font-size: 1.4rem; line-height: 1;
+  }
+
+  .chart-stat-lbl {
+    font-family: 'Space Mono', monospace; font-size: 0.55rem;
+    color: var(--text-muted); letter-spacing: 0.08em; margin-top: 3px;
+  }
+
+  .chart-area { width: 100%; position: relative; }
+
+  canvas { display: block; }
+
+  /* Wind Rose */
+  .wind-rose-wrap { display: flex; justify-content: center; align-items: center; padding: 8px 0; }
+
+  footer {
+    position: relative; z-index: 10;
+    background: var(--bg-deep); border-top: 1px solid var(--border);
+    padding: 16px 40px;
+  }
+
+  .footer-inner {
+    max-width: 1400px; margin: 0 auto;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+
+  .footer-text {
+    font-family: 'Space Mono', monospace; font-size: 0.58rem;
+    color: var(--text-muted); letter-spacing: 0.08em;
+  }
+
+  .footer-links { display: flex; gap: 20px; }
+
+  .footer-link {
+    font-family: 'Space Mono', monospace; font-size: 0.58rem;
+    color: var(--text-muted); text-decoration: none;
+    letter-spacing: 0.08em; transition: color 0.2s;
+  }
+
+  .footer-link:hover { color: var(--accent-cyan); }
+
+  @media (max-width: 900px) {
+    .col-8, .col-6, .col-4, .col-3 { grid-column: span 12; }
+    .stat-bar-inner { flex-wrap: wrap; }
+    .stat-item { min-width: 45%; flex: 1 1 45%; }
+    header, .stat-bar, .tab-nav, .filter-bar, footer { padding-left: 12px; padding-right: 12px; }
+    .main-content { padding: 12px; }
+    .tab-btn { padding: 12px 16px; font-size: 0.75rem; }
+    .header-inner { flex-wrap: wrap; gap: 10px; }
+    .header-timestamp { display: none; }
+    .dashboard-grid { gap: 10px; }
+    iframe { min-height: 250px; }
+  }
+
+  @media (max-width: 480px) {
+    .stat-item { min-width: 100%; }
+    .tab-btn { padding: 10px 12px; font-size: 0.7rem; gap: 6px; }
+    .tab-badge { display: none; }
+    .filter-chips { gap: 4px; }
+    .chip { padding: 4px 10px; font-size: 0.55rem; }
+  }
+</style>
+</head>
+<body>
+<div id="allen-dock-wrapper">
+
+<!-- HEADER -->
+<header>
+  <div class="header-inner">
+    <div class="station-identity">
+      <div class="station-icon">
+        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="24" cy="24" r="22" stroke="rgba(56,180,255,0.25)" stroke-width="1"/>
+          <circle cx="24" cy="24" r="16" stroke="rgba(56,180,255,0.15)" stroke-width="1"/>
+          <rect x="22" y="8" width="4" height="24" fill="rgba(56,180,255,0.6)" rx="1"/>
+          <rect x="14" y="28" width="20" height="3" fill="rgba(56,180,255,0.4)" rx="1"/>
+          <rect x="10" y="31" width="28" height="2" fill="rgba(56,180,255,0.25)" rx="1"/>
+          <path d="M8 36 Q14 34 20 36 Q26 38 32 36 Q38 34 42 36" stroke="rgba(0,229,204,0.5)" stroke-width="1.2" fill="none"/>
+          <path d="M8 39 Q14 37 20 39 Q26 41 32 39 Q38 37 42 39" stroke="rgba(0,229,204,0.25)" stroke-width="1" fill="none"/>
+          <circle cx="24" cy="7" r="2" fill="rgba(56,180,255,0.8)"/>
+          <circle cx="24" cy="7" r="4" stroke="rgba(56,180,255,0.3)" stroke-width="1" fill="none"/>
+        </svg>
+      </div>
+      <div class="station-name">
+        <h1>Allen Dock</h1>
+        <span>Environmental Research Station · Est. 2024</span>
+      </div>
+    </div>
+    <div class="header-meta">
+      <div class="live-indicator">
+        <div class="live-dot"></div>
+        <span>Live Data</span>
+      </div>
+      <div class="header-timestamp" id="ts">Loading...</div>
+    </div>
+  </div>
+</header>
+
+<!-- STAT BAR -->
+<div class="stat-bar">
+  <div class="stat-bar-inner">
+    <div class="stat-item">
+      <div class="stat-icon">🌡️</div>
+      <div class="stat-data">
+        <div class="stat-label">Air Temp</div>
+        <div class="stat-value" style="color:var(--accent-coral)">8.4<span class="stat-unit">°C</span></div>
+        <div class="stat-delta up">▲ 1.2° from yesterday</div>
+      </div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-icon">💨</div>
+      <div class="stat-data">
+        <div class="stat-label">Wind Speed</div>
+        <div class="stat-value" style="color:var(--accent-cyan)">4.7<span class="stat-unit">m/s</span></div>
+        <div class="stat-delta neutral">→ NNW</div>
+      </div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-icon">☀️</div>
+      <div class="stat-data">
+        <div class="stat-label">Solar Rad.</div>
+        <div class="stat-value" style="color:var(--accent-amber)">312<span class="stat-unit">W/m²</span></div>
+        <div class="stat-delta up">▲ Partly cloudy</div>
+      </div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-icon">💧</div>
+      <div class="stat-data">
+        <div class="stat-label">Humidity</div>
+        <div class="stat-value" style="color:var(--accent-teal)">74<span class="stat-unit">%RH</span></div>
+        <div class="stat-delta down">▼ 3% from 6h avg</div>
+      </div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-icon">⬇️</div>
+      <div class="stat-data">
+        <div class="stat-label">Barometric</div>
+        <div class="stat-value" style="color:var(--accent-green)">1013<span class="stat-unit">hPa</span></div>
+        <div class="stat-delta neutral">→ Steady</div>
+      </div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-icon">🌧️</div>
+      <div class="stat-data">
+        <div class="stat-label">Rain Intensity</div>
+        <div class="stat-value" style="color:#7dd3fc">0.00<span class="stat-unit">mm/hr</span></div>
+        <div class="stat-delta neutral">→ Dry</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TAB NAV -->
+<div class="tab-nav">
+  <div class="tab-nav-inner">
+    <button class="tab-btn active" onclick="switchTab('live', this)">
+      <span>⬤</span> Live Conditions <span class="tab-badge">Now</span>
+    </button>
+    <button class="tab-btn" onclick="switchTab('historical', this)">
+      📈 Historical Deep Dive <span class="tab-badge">2yr</span>
+    </button>
+    <button class="tab-btn" onclick="switchTab('research', this)">
+      🔬 Research View <span class="tab-badge new">Beta</span>
+    </button>
+  </div>
+</div>
+
+<!-- FILTER BAR -->
+<div class="filter-bar">
+  <div class="filter-bar-inner">
+    <span class="filter-label">Date Range:</span>
+    <div class="filter-chips">
+      <button class="chip" onclick="setRange('today',this)">Today</button>
+      <button class="chip active" onclick="setRange('7d',this)">7 Days</button>
+      <button class="chip" onclick="setRange('30d',this)">30 Days</button>
+      <button class="chip" onclick="setRange('3m',this)">3 Months</button>
+      <button class="chip" onclick="setRange('1y',this)">1 Year</button>
+      <button class="chip" onclick="setRange('all',this)">All Data</button>
+    </div>
+    <div class="filter-sep"></div>
+    <div class="date-range-input" id="dateRangeDisplay">📅 Jan 1, 2024 → Mar 31, 2026</div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="scrollable-main">
+<div class="main-content">
+
+  <!-- TAB 1: LIVE CONDITIONS -->
+  <div class="tab-panel active" id="panel-live">
+    <div class="section-label">Current Sensor Readings — Allen Dock Station</div>
+    <div class="dashboard-grid">
+
+      <!-- Temperature Trends -->
+      <div class="viz-card col-8">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-title">Temperature Trends</div>
+            <div class="card-subtitle">Air · Water 0m · 1m · 2m — Monthly Average</div>
+          </div>
+          <div class="card-actions"><span class="card-tag tag-temp">Temp</span></div>
+        </div>
+        <div class="card-body">
+          <div class="chart-stat-row">
+            <div class="chart-stat">
+              <div class="chart-stat-val" style="color:var(--accent-coral)">8.4°C</div>
+              <div class="chart-stat-lbl">Air Temp Now</div>
+            </div>
+            <div class="chart-stat">
+              <div class="chart-stat-val" style="color:#fbbf24">7.1°C</div>
+              <div class="chart-stat-lbl">Water Surface</div>
+            </div>
+            <div class="chart-stat">
+              <div class="chart-stat-val" style="color:#a78bfa">6.8°C</div>
+              <div class="chart-stat-lbl">1m Depth</div>
+            </div>
+            <div class="chart-stat">
+              <div class="chart-stat-val" style="color:var(--accent-teal)">6.2°C</div>
+              <div class="chart-stat-lbl">2m Depth</div>
+            </div>
+          </div>
+          <div class="chart-area" style="height:240px">
+            <iframe src="https://us-east-1.online.tableau.com/views/AllenDockData/TemperatureTrends?:embed=y&:showVizHome=no&:toolbar=no&:tabs=no" width="100%" height="240" frameborder="0" style="border:none;background:transparent;"></iframe>
+          </div>
+        </div>
+      </div>
+
+      <!-- Wind Direction -->
+      <div class="viz-card col-4">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-title">Wind Direction</div>
+            <div class="card-subtitle">Frequency by Compass Direction</div>
+          </div>
+          <div class="card-actions"><span class="card-tag tag-wind">Wind</span></div>
+        </div>
+        <div class="card-body">
+          <div class="chart-area" style="height:280px">
+            <iframe src="https://us-east-1.online.tableau.com/views/AllenDockData/AverageWindDirection?:embed=y&:showVizHome=no&:toolbar=no&:tabs=no" width="100%" height="280" frameborder="0" style="border:none;background:transparent;"></iframe>
+          </div>
+        </div>
+      </div>
+
+      <!-- Solar Radiation -->
+      <div class="viz-card col-4">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-title">Solar Radiation</div>
+            <div class="card-subtitle">Avg W/m² by Month</div>
+          </div>
+          <div class="card-actions"><span class="card-tag tag-solar">Solar</span></div>
+        </div>
+        <div class="card-body">
+          <div class="chart-stat-row">
+            <div class="chart-stat">
+              <div class="chart-stat-val" style="color:var(--accent-amber)">312</div>
+              <div class="chart-stat-lbl">W/m² Now</div>
+            </div>
+            <div class="chart-stat">
+              <div class="chart-stat-val" style="color:var(--text-secondary)">287</div>
+              <div class="chart-stat-lbl">30d Avg</div>
+            </div>
+          </div>
+          <div class="chart-area" style="height:130px">
+            <iframe src="https://us-east-1.online.tableau.com/views/AllenDockData/SolarRadiation?:embed=y&:showVizHome=no&:toolbar=no&:tabs=no" width="100%" height="130" frameborder="0" style="border:none;background:transparent;"></iframe>
+          </div>
+        </div>
+      </div>
+
+      <!-- Humidity -->
+      <div class="viz-card col-4">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-title">Relative Humidity</div>
+            <div class="card-subtitle">Avg RH % by Month</div>
+          </div>
+          <div class="card-actions"><span class="card-tag tag-humid">RH</span></div>
+        </div>
+        <div class="card-body">
+          <div class="chart-stat-row">
+            <div class="chart-stat">
+              <div class="chart-stat-val" style="color:var(--accent-teal)">74%</div>
+              <div class="chart-stat-lbl">Current RH</div>
+            </div>
+            <div class="chart-stat">
+              <div class="chart-stat-val" style="color:var(--text-secondary)">71%</div>
+              <div class="chart-stat-lbl">30d Avg</div>
+            </div>
+          </div>
+          <div class="chart-area" style="height:130px">
+            <iframe src="https://us-east-1.online.tableau.com/views/AllenDockData/Humidity?:embed=y&:showVizHome=no&:toolbar=no&:tabs=no" width="100%" height="130" frameborder="0" style="border:none;background:transparent;"></iframe>
+          </div>
+        </div>
+      </div>
+
+      <!-- Barometric Pressure -->
+      <div class="viz-card col-4">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-title">Barometric Pressure</div>
+            <div class="card-subtitle">Avg hPa by Month</div>
+          </div>
+          <div class="card-actions"><span class="card-tag tag-pressure">Pressure</span></div>
+        </div>
+        <div class="card-body">
+          <div class="chart-stat-row">
+            <div class="chart-stat">
+              <div class="chart-stat-val" style="color:var(--accent-green)">1013</div>
+              <div class="chart-stat-lbl">hPa Now</div>
+            </div>
+            <div class="chart-stat">
+              <div class="chart-stat-val" style="color:var(--text-secondary)">1011</div>
+              <div class="chart-stat-lbl">30d Avg</div>
+            </div>
+          </div>
+          <div class="chart-area" style="height:130px">
+            <iframe src="https://us-east-1.online.tableau.com/views/AllenDockData/BarometricPressure?:embed=y&:showVizHome=no&:toolbar=no&:tabs=no" width="100%" height="130" frameborder="0" style="border:none;background:transparent;"></iframe>
+          </div>
+        </div>
+      </div>
+
+      <!-- Wet Bulb -->
+      <div class="viz-card col-4">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-title">Wet Bulb Temp</div>
+            <div class="card-subtitle">Heat Stress Index</div>
+          </div>
+          <div class="card-actions"><span class="card-tag tag-wb">WB</span></div>
+        </div>
+        <div class="card-body">
+          <div class="chart-stat-row">
+            <div class="chart-stat">
+              <div class="chart-stat-val" style="color:#fbbf24">6.1°C</div>
+              <div class="chart-stat-lbl">WB Temp</div>
+            </div>
+            <div class="chart-stat">
+              <div class="chart-stat-val" style="color:var(--accent-green)">Low</div>
+              <div class="chart-stat-lbl">Heat Index</div>
+            </div>
+          </div>
+          <div class="chart-area" style="height:130px">
+            <iframe src="https://us-east-1.online.tableau.com/views/AllenDockData/WetBulbTemperatures?:embed=y&:showVizHome=no&:toolbar=no&:tabs=no" width="100%" height="130" frameborder="0" style="border:none;background:transparent;"></iframe>
+          </div>
+        </div>
+      </div>
+
+      <!-- Wind Speeds -->
+      <div class="viz-card col-6">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-title">Wind Speed & Gusts</div>
+            <div class="card-subtitle">Avg & Max Wind Speed by Month</div>
+          </div>
+          <div class="card-actions"><span class="card-tag tag-wind">Wind</span></div>
+        </div>
+        <div class="card-body">
+          <div class="chart-stat-row">
+            <div class="chart-stat">
+              <div class="chart-stat-val" style="color:var(--accent-cyan)">4.7</div>
+              <div class="chart-stat-lbl">Avg m/s</div>
+            </div>
+            <div class="chart-stat">
+              <div class="chart-stat-val" style="color:#7dd3fc">11.2</div>
+              <div class="chart-stat-lbl">Max Gust</div>
+            </div>
+          </div>
+          <div class="chart-area" style="height:150px">
+            <iframe src="https://us-east-1.online.tableau.com/views/AllenDockData/AverageWindSpeeds?:embed=y&:showVizHome=no&:toolbar=no&:tabs=no" width="100%" height="150" frameborder="0" style="border:none;background:transparent;"></iframe>
+          </div>
+        </div>
+      </div>
+
+      <!-- Precipitation -->
+      <div class="viz-card col-6">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-title">Precipitation</div>
+            <div class="card-subtitle">Total Rain & Intensity by Month</div>
+          </div>
+          <div class="card-actions"><span class="card-tag tag-precip">Rain</span></div>
+        </div>
+        <div class="card-body">
+          <div class="chart-stat-row">
+            <div class="chart-stat">
+              <div class="chart-stat-val" style="color:#7dd3fc">0.00</div>
+              <div class="chart-stat-lbl">mm/hr Now</div>
+            </div>
+            <div class="chart-stat">
+              <div class="chart-stat-val" style="color:var(--text-secondary)">2.4</div>
+              <div class="chart-stat-lbl">30d Avg mm</div>
+            </div>
+          </div>
+          <div class="chart-area" style="height:150px">
+            <iframe src="https://us-east-1.online.tableau.com/views/AllenDockData/Precipitation?:embed=y&:showVizHome=no&:toolbar=no&:tabs=no" width="100%" height="150" frameborder="0" style="border:none;background:transparent;"></iframe>
+          </div>
+        </div>
+      </div>
+
+      <!-- CO2 -->
+      <div class="viz-card col-6">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-title">CO₂</div>
+            <div class="card-subtitle">Avg ppm by Month</div>
+          </div>
+          <div class="card-actions"><span class="card-tag tag-co2">CO₂</span></div>
+        </div>
+        <div class="card-body">
+          <div class="chart-stat-row">
+            <div class="chart-stat">
+              <div class="chart-stat-val" style="color:#a78bfa">418</div>
+              <div class="chart-stat-lbl">ppm Now</div>
+            </div>
+            <div class="chart-stat">
+              <div class="chart-stat-val" style="color:var(--text-secondary)">415</div>
+              <div class="chart-stat-lbl">30d Avg</div>
+            </div>
+          </div>
+          <div class="chart-area" style="height:150px">
+            <iframe src="https://us-east-1.online.tableau.com/views/AllenDockData/CO2?:embed=y&:showVizHome=no&:toolbar=no&:tabs=no" width="100%" height="150" frameborder="0" style="border:none;background:transparent;"></iframe>
+          </div>
+        </div>
+      </div>
+
+      <!-- Max Wind Speeds separately -->
+      <div class="viz-card col-6">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-title">Maximum Wind Speeds</div>
+            <div class="card-subtitle">Peak gusts by Month</div>
+          </div>
+          <div class="card-actions"><span class="card-tag tag-wind">Wind</span></div>
+        </div>
+        <div class="card-body">
+          <div class="chart-stat-row">
+            <div class="chart-stat">
+              <div class="chart-stat-val" style="color:#7dd3fc">11.2</div>
+              <div class="chart-stat-lbl">Max m/s</div>
+            </div>
+            <div class="chart-stat">
+              <div class="chart-stat-val" style="color:var(--text-secondary)">9.8</div>
+              <div class="chart-stat-lbl">30d Avg Max</div>
+            </div>
+          </div>
+          <div class="chart-area" style="height:150px">
+            <iframe src="https://us-east-1.online.tableau.com/views/AllenDockData/MaximumWindSpeeds?:embed=y&:showVizHome=no&:toolbar=no&:tabs=no" width="100%" height="150" frameborder="0" style="border:none;background:transparent;"></iframe>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- TAB 2: HISTORICAL -->
+  <div class="tab-panel" id="panel-historical">
+    <div class="section-label">Multi-Year Historical Analysis — Jan 2024 → Mar 2026</div>
+    <div class="dashboard-grid">
+      <div class="viz-card col-12">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-title">Full 2-Year Temperature Record</div>
+            <div class="card-subtitle">All readings · Jan 2024 – Mar 2026</div>
+          </div>
+          <div class="card-actions"><span class="card-tag tag-temp">Temp</span></div>
+        </div>
+        <div class="card-body">
+          <div class="chart-area" style="height:300px">
+            <iframe src="https://us-east-1.online.tableau.com/views/AllenDockData/TemperatureTrends?:embed=y&:showVizHome=no&:toolbar=no&:tabs=no" width="100%" height="300" frameborder="0" style="border:none;background:transparent;"></iframe>
+          </div>
+        </div>
+      </div>
+      <div class="viz-card col-6">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-title">Historical Wind Speeds</div>
+            <div class="card-subtitle">Jan 2024 – Mar 2026</div>
+          </div>
+          <div class="card-actions"><span class="card-tag tag-wind">Wind</span></div>
+        </div>
+        <div class="card-body">
+          <div class="chart-area" style="height:220px">
+            <iframe src="https://us-east-1.online.tableau.com/views/AllenDockData/AverageWindSpeeds?:embed=y&:showVizHome=no&:toolbar=no&:tabs=no" width="100%" height="220" frameborder="0" style="border:none;background:transparent;"></iframe>
+          </div>
+        </div>
+      </div>
+      <div class="viz-card col-6">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-title">Historical Solar Radiation</div>
+            <div class="card-subtitle">Jan 2024 – Mar 2026</div>
+          </div>
+          <div class="card-actions"><span class="card-tag tag-solar">Solar</span></div>
+        </div>
+        <div class="card-body">
+          <div class="chart-area" style="height:220px">
+            <iframe src="https://us-east-1.online.tableau.com/views/AllenDockData/SolarRadiation?:embed=y&:showVizHome=no&:toolbar=no&:tabs=no" width="100%" height="220" frameborder="0" style="border:none;background:transparent;"></iframe>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 3: RESEARCH -->
+  <div class="tab-panel" id="panel-research">
+    <div class="section-label">Research Parameter Explorer</div>
+    <div class="dashboard-grid">
+      <div class="viz-card col-12">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-title">Multi-Parameter Overlay</div>
+            <div class="card-subtitle">Jan 2024 – Mar 2026 · Monthly Resolution</div>
+          </div>
+          <div class="card-actions"><span class="card-tag tag-temp">Research Mode</span></div>
+        </div>
+        <div class="card-body">
+          <div class="chart-area" style="height:350px">
+            <iframe src="https://us-east-1.online.tableau.com/views/AllenDockData/AllenDockData?:embed=y&:showVizHome=no&:toolbar=no&:tabs=no" width="100%" height="350" frameborder="0" style="border:none;background:transparent;"></iframe>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-text">
+      Allen Dock Environmental Research Station · Data via iChart6 · Updated continuously
+    </div>
+    <div class="footer-links">
+      <a href="#" class="footer-link">Download CSV</a>
+      <a href="#" class="footer-link">Station Info</a>
+      <a href="#" class="footer-link">Tableau Dashboard ↗</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+// ── TIMESTAMP ──
+function updateTimestamp() {
+  const now = new Date();
+  document.getElementById('ts').textContent = now.toLocaleString('en-US', {
+    month: 'short', day: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+  }) + ' EST';
+}
+updateTimestamp();
+setInterval(updateTimestamp, 1000);
+
+// ── TAB SWITCHING ──
+function switchTab(tabId, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + tabId).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── FILTER CHIPS ──
+function setRange(range, btn) {
+  document.querySelectorAll('.filter-chips .chip').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  const ranges = {
+    'today': 'Today',
+    '7d': 'Last 7 Days',
+    '30d': 'Last 30 Days',
+    '3m': 'Last 3 Months',
+    '1y': 'Last 1 Year',
+    'all': 'Jan 1, 2024 → Mar 31, 2026'
+  };
+  document.getElementById('dateRangeDisplay').textContent = '📅 ' + ranges[range];
+}
+</script>
+</div><!-- end allen-dock-wrapper -->
+</body>
+</html>
+
