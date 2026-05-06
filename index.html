@@ -5,18 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Allen Dock Research Station — Live Environmental Monitor</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
-<script type='text/javascript' src='https://public.tableau.com/javascripts/api/viz_v1.js'></script>
-<style>
-  .tableauPlaceholder { width: 100%; height: 100%; }
-  .tableauPlaceholder object { width: 100%; height: 100%; }
-</style>
+<script type='text/javascript' src='https://public.tableau.com/javascripts/api/tableau-2.min.js'></script>
 <style>
   :root {
     --bg-void: #050810;
     --bg-deep: #080d1a;
     --bg-panel: #0d1526;
     --bg-card: #111c33;
-    --bg-highlight: #162040;
     --border: rgba(56, 130, 220, 0.18);
     --border-bright: rgba(56, 180, 255, 0.4);
     --accent-cyan: #38b4ff;
@@ -84,7 +79,6 @@
   }
 
   .station-identity { display: flex; align-items: center; gap: 18px; }
-
   .station-icon { width: 48px; height: 48px; flex-shrink: 0; }
   .station-icon svg { width: 100%; height: 100%; }
 
@@ -167,7 +161,6 @@
   }
 
   .stat-unit { font-size: 0.65rem; color: var(--text-secondary); font-weight: 300; margin-left: 2px; }
-
   .stat-delta { font-family: 'Space Mono', monospace; font-size: 0.6rem; margin-top: 3px; }
   .stat-delta.up { color: var(--accent-coral); }
   .stat-delta.down { color: var(--accent-cyan); }
@@ -284,7 +277,6 @@
   .col-8 { grid-column: span 8; }
   .col-6 { grid-column: span 6; }
   .col-4 { grid-column: span 4; }
-  .col-3 { grid-column: span 3; }
   .col-12 { grid-column: span 12; }
 
   .viz-card {
@@ -365,12 +357,19 @@
     color: var(--text-muted); letter-spacing: 0.08em; margin-top: 3px;
   }
 
-  .chart-area { width: 100%; position: relative; }
+  .tableau-container {
+    width: 100%;
+    position: relative;
+    overflow: hidden;
+  }
 
-  canvas { display: block; }
-
-  /* Wind Rose */
-  .wind-rose-wrap { display: flex; justify-content: center; align-items: center; padding: 8px 0; }
+  .viz-loading {
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg-card);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6rem; color: var(--text-muted);
+    letter-spacing: 0.1em;
+  }
 
   footer {
     position: relative; z-index: 10;
@@ -399,17 +398,24 @@
   .footer-link:hover { color: var(--accent-cyan); }
 
   @media (max-width: 900px) {
-    .col-8, .col-6, .col-4, .col-3 { grid-column: span 12; }
+    .col-8, .col-6, .col-4 { grid-column: span 12; }
     .stat-bar-inner { flex-wrap: wrap; }
-    .stat-item { min-width: 140px; }
-    header, .stat-bar, .tab-nav, .filter-bar, footer { padding-left: 16px; padding-right: 16px; }
-    .main-content { padding: 16px; }
+    .stat-item { min-width: 45%; flex: 1 1 45%; }
+    header, .stat-bar, .tab-nav, .filter-bar, footer { padding-left: 12px; padding-right: 12px; }
+    .main-content { padding: 12px; }
+    .tab-btn { padding: 12px 16px; font-size: 0.75rem; }
+  }
+
+  @media (max-width: 480px) {
+    .stat-item { min-width: 100%; }
+    .tab-btn { padding: 10px 12px; font-size: 0.7rem; gap: 6px; }
+    .tab-badge { display: none; }
+    .chip { padding: 4px 10px; font-size: 0.55rem; }
   }
 </style>
 </head>
 <body>
 
-<!-- HEADER -->
 <header>
   <div class="header-inner">
     <div class="station-identity">
@@ -441,7 +447,6 @@
   </div>
 </header>
 
-<!-- STAT BAR -->
 <div class="stat-bar">
   <div class="stat-bar-inner">
     <div class="stat-item">
@@ -495,7 +500,6 @@
   </div>
 </div>
 
-<!-- TAB NAV -->
 <div class="tab-nav">
   <div class="tab-nav-inner">
     <button class="tab-btn active" onclick="switchTab('live', this)">
@@ -510,33 +514,29 @@
   </div>
 </div>
 
-<!-- FILTER BAR -->
 <div class="filter-bar">
   <div class="filter-bar-inner">
     <span class="filter-label">Date Range:</span>
     <div class="filter-chips">
-      <button class="chip" onclick="setRange('today',this)">Today</button>
-      <button class="chip active" onclick="setRange('7d',this)">7 Days</button>
-      <button class="chip" onclick="setRange('30d',this)">30 Days</button>
-      <button class="chip" onclick="setRange('3m',this)">3 Months</button>
-      <button class="chip" onclick="setRange('1y',this)">1 Year</button>
-      <button class="chip" onclick="setRange('all',this)">All Data</button>
+      <button class="chip" onclick="setRange(1, this)">Today</button>
+      <button class="chip" onclick="setRange(7, this)">7 Days</button>
+      <button class="chip active" onclick="setRange(30, this)">30 Days</button>
+      <button class="chip" onclick="setRange(90, this)">3 Months</button>
+      <button class="chip" onclick="setRange(365, this)">1 Year</button>
+      <button class="chip" onclick="setRange(9999, this)">All Data</button>
     </div>
     <div class="filter-sep"></div>
-    <div class="date-range-input" id="dateRangeDisplay">📅 Jan 1, 2024 → Mar 31, 2026</div>
+    <div class="date-range-input" id="dateRangeDisplay">📅 Last 30 Days</div>
   </div>
 </div>
 
-<!-- MAIN -->
 <div class="scrollable-main">
 <div class="main-content">
 
-  <!-- TAB 1: LIVE CONDITIONS -->
   <div class="tab-panel active" id="panel-live">
     <div class="section-label">Current Sensor Readings — Allen Dock Station</div>
     <div class="dashboard-grid">
 
-      <!-- Temperature Trends -->
       <div class="viz-card col-8">
         <div class="card-header">
           <div class="card-title-group">
@@ -564,24 +564,12 @@
               <div class="chart-stat-lbl">2m Depth</div>
             </div>
           </div>
-          <div class="chart-area" style="height:240px">
-            <div class='tableauPlaceholder' style='position:relative;width:100%;height:240px'>
-              <object class='tableauViz' style='display:none;'>
-                <param name='host_url' value='https%3A%2F%2Fpublic.tableau.com%2F' />
-                <param name='embed_code_version' value='3' />
-                <param name='site_root' value='' />
-                <param name='name' value='AllenDockData/TemperatureTrends' />
-                <param name='tabs' value='no' /><param name='toolbar' value='no' />
-                <param name='animate_transition' value='yes' />
-                <param name='display_static_image' value='yes' />
-                <param name='display_spinner' value='yes' />
-              </object>
-            </div>
+          <div class="tableau-container" style="height:240px">
+            <div id="viz-temp" class="viz-loading" style="height:240px">Loading...</div>
           </div>
         </div>
       </div>
 
-      <!-- Wind Direction -->
       <div class="viz-card col-4">
         <div class="card-header">
           <div class="card-title-group">
@@ -591,26 +579,12 @@
           <div class="card-actions"><span class="card-tag tag-wind">Wind</span></div>
         </div>
         <div class="card-body">
-          <div class="chart-area" style="height:280px">
-            <div class='tableauPlaceholder' style='position:relative;width:100%;height:280px'>
-              <object class='tableauViz' style='display:none;'>
-                <param name='host_url' value='https%3A%2F%2Fpublic.tableau.com%2F' />
-                <param name='embed_code_version' value='3' />
-                <param name='site_root' value='' />
-                <param name='name' value='AllenDockData/AverageWindDirection' />
-                <param name='tabs' value='no' /><param name='toolbar' value='no' />
-                <param name='animate_transition' value='yes' />
-                <param name='display_static_image' value='yes' />
-              </object>
-            </div>
-          </div>
-          <div style="text-align:center;margin-top:4px">
-            <span style="font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--text-muted)">Prevailing: <span style="color:var(--accent-cyan)">N / NNW</span></span>
+          <div class="tableau-container" style="height:280px">
+            <div id="viz-wind-dir" class="viz-loading" style="height:280px">Loading...</div>
           </div>
         </div>
       </div>
 
-      <!-- Solar Radiation -->
       <div class="viz-card col-4">
         <div class="card-header">
           <div class="card-title-group">
@@ -630,23 +604,12 @@
               <div class="chart-stat-lbl">30d Avg</div>
             </div>
           </div>
-          <div class="chart-area" style="height:130px">
-            <div class='tableauPlaceholder' style='position:relative;width:100%;height:130px'>
-              <object class='tableauViz' style='display:none;'>
-                <param name='host_url' value='https%3A%2F%2Fpublic.tableau.com%2F' />
-                <param name='embed_code_version' value='3' />
-                <param name='site_root' value='' />
-                <param name='name' value='AllenDockData/SolarRadiation' />
-                <param name='tabs' value='no' /><param name='toolbar' value='no' />
-                <param name='animate_transition' value='yes' />
-                <param name='display_static_image' value='yes' />
-              </object>
-            </div>
+          <div class="tableau-container" style="height:130px">
+            <div id="viz-solar" class="viz-loading" style="height:130px">Loading...</div>
           </div>
         </div>
       </div>
 
-      <!-- Humidity -->
       <div class="viz-card col-4">
         <div class="card-header">
           <div class="card-title-group">
@@ -666,23 +629,12 @@
               <div class="chart-stat-lbl">30d Avg</div>
             </div>
           </div>
-          <div class="chart-area" style="height:130px">
-            <div class='tableauPlaceholder' style='position:relative;width:100%;height:130px'>
-              <object class='tableauViz' style='display:none;'>
-                <param name='host_url' value='https%3A%2F%2Fpublic.tableau.com%2F' />
-                <param name='embed_code_version' value='3' />
-                <param name='site_root' value='' />
-                <param name='name' value='AllenDockData/Humidity' />
-                <param name='tabs' value='no' /><param name='toolbar' value='no' />
-                <param name='animate_transition' value='yes' />
-                <param name='display_static_image' value='yes' />
-              </object>
-            </div>
+          <div class="tableau-container" style="height:130px">
+            <div id="viz-humidity" class="viz-loading" style="height:130px">Loading...</div>
           </div>
         </div>
       </div>
 
-      <!-- Barometric Pressure -->
       <div class="viz-card col-4">
         <div class="card-header">
           <div class="card-title-group">
@@ -702,23 +654,12 @@
               <div class="chart-stat-lbl">30d Avg</div>
             </div>
           </div>
-          <div class="chart-area" style="height:130px">
-            <div class='tableauPlaceholder' style='position:relative;width:100%;height:130px'>
-              <object class='tableauViz' style='display:none;'>
-                <param name='host_url' value='https%3A%2F%2Fpublic.tableau.com%2F' />
-                <param name='embed_code_version' value='3' />
-                <param name='site_root' value='' />
-                <param name='name' value='AllenDockData/BarometricPressure' />
-                <param name='tabs' value='no' /><param name='toolbar' value='no' />
-                <param name='animate_transition' value='yes' />
-                <param name='display_static_image' value='yes' />
-              </object>
-            </div>
+          <div class="tableau-container" style="height:130px">
+            <div id="viz-pressure" class="viz-loading" style="height:130px">Loading...</div>
           </div>
         </div>
       </div>
 
-      <!-- Wet Bulb -->
       <div class="viz-card col-4">
         <div class="card-header">
           <div class="card-title-group">
@@ -738,28 +679,17 @@
               <div class="chart-stat-lbl">Heat Index</div>
             </div>
           </div>
-          <div class="chart-area" style="height:130px">
-            <div class='tableauPlaceholder' style='position:relative;width:100%;height:130px'>
-              <object class='tableauViz' style='display:none;'>
-                <param name='host_url' value='https%3A%2F%2Fpublic.tableau.com%2F' />
-                <param name='embed_code_version' value='3' />
-                <param name='site_root' value='' />
-                <param name='name' value='AllenDockData/WetBulbTemperatures' />
-                <param name='tabs' value='no' /><param name='toolbar' value='no' />
-                <param name='animate_transition' value='yes' />
-                <param name='display_static_image' value='yes' />
-              </object>
-            </div>
+          <div class="tableau-container" style="height:130px">
+            <div id="viz-wetbulb" class="viz-loading" style="height:130px">Loading...</div>
           </div>
         </div>
       </div>
 
-      <!-- Wind Speeds -->
       <div class="viz-card col-6">
         <div class="card-header">
           <div class="card-title-group">
             <div class="card-title">Wind Speed & Gusts</div>
-            <div class="card-subtitle">Avg & Max Wind Speed by Month</div>
+            <div class="card-subtitle">Avg Wind Speed by Month</div>
           </div>
           <div class="card-actions"><span class="card-tag tag-wind">Wind</span></div>
         </div>
@@ -774,23 +704,12 @@
               <div class="chart-stat-lbl">Max Gust</div>
             </div>
           </div>
-          <div class="chart-area" style="height:150px">
-            <div class='tableauPlaceholder' style='position:relative;width:100%;height:150px'>
-              <object class='tableauViz' style='display:none;'>
-                <param name='host_url' value='https%3A%2F%2Fpublic.tableau.com%2F' />
-                <param name='embed_code_version' value='3' />
-                <param name='site_root' value='' />
-                <param name='name' value='AllenDockData/AverageWindSpeeds' />
-                <param name='tabs' value='no' /><param name='toolbar' value='no' />
-                <param name='animate_transition' value='yes' />
-                <param name='display_static_image' value='yes' />
-              </object>
-            </div>
+          <div class="tableau-container" style="height:150px">
+            <div id="viz-wind-speed" class="viz-loading" style="height:150px">Loading...</div>
           </div>
         </div>
       </div>
 
-      <!-- Precipitation -->
       <div class="viz-card col-6">
         <div class="card-header">
           <div class="card-title-group">
@@ -810,23 +729,12 @@
               <div class="chart-stat-lbl">30d Avg mm</div>
             </div>
           </div>
-          <div class="chart-area" style="height:150px">
-            <div class='tableauPlaceholder' style='position:relative;width:100%;height:150px'>
-              <object class='tableauViz' style='display:none;'>
-                <param name='host_url' value='https%3A%2F%2Fpublic.tableau.com%2F' />
-                <param name='embed_code_version' value='3' />
-                <param name='site_root' value='' />
-                <param name='name' value='AllenDockData/Precipitation' />
-                <param name='tabs' value='no' /><param name='toolbar' value='no' />
-                <param name='animate_transition' value='yes' />
-                <param name='display_static_image' value='yes' />
-              </object>
-            </div>
+          <div class="tableau-container" style="height:150px">
+            <div id="viz-precip" class="viz-loading" style="height:150px">Loading...</div>
           </div>
         </div>
       </div>
 
-      <!-- CO2 -->
       <div class="viz-card col-6">
         <div class="card-header">
           <div class="card-title-group">
@@ -846,23 +754,12 @@
               <div class="chart-stat-lbl">30d Avg</div>
             </div>
           </div>
-          <div class="chart-area" style="height:150px">
-            <div class='tableauPlaceholder' style='position:relative;width:100%;height:150px'>
-              <object class='tableauViz' style='display:none;'>
-                <param name='host_url' value='https%3A%2F%2Fpublic.tableau.com%2F' />
-                <param name='embed_code_version' value='3' />
-                <param name='site_root' value='' />
-                <param name='name' value='AllenDockData/CO2' />
-                <param name='tabs' value='no' /><param name='toolbar' value='no' />
-                <param name='animate_transition' value='yes' />
-                <param name='display_static_image' value='yes' />
-              </object>
-            </div>
+          <div class="tableau-container" style="height:150px">
+            <div id="viz-co2" class="viz-loading" style="height:150px">Loading...</div>
           </div>
         </div>
       </div>
 
-      <!-- Max Wind Speeds separately -->
       <div class="viz-card col-6">
         <div class="card-header">
           <div class="card-title-group">
@@ -882,18 +779,8 @@
               <div class="chart-stat-lbl">30d Avg Max</div>
             </div>
           </div>
-          <div class="chart-area" style="height:150px">
-            <div class='tableauPlaceholder' style='position:relative;width:100%;height:150px'>
-              <object class='tableauViz' style='display:none;'>
-                <param name='host_url' value='https%3A%2F%2Fpublic.tableau.com%2F' />
-                <param name='embed_code_version' value='3' />
-                <param name='site_root' value='' />
-                <param name='name' value='AllenDockData/MaximumWindSpeeds' />
-                <param name='tabs' value='no' /><param name='toolbar' value='no' />
-                <param name='animate_transition' value='yes' />
-                <param name='display_static_image' value='yes' />
-              </object>
-            </div>
+          <div class="tableau-container" style="height:150px">
+            <div id="viz-max-wind" class="viz-loading" style="height:150px">Loading...</div>
           </div>
         </div>
       </div>
@@ -901,31 +788,20 @@
     </div>
   </div>
 
-  <!-- TAB 2: HISTORICAL -->
   <div class="tab-panel" id="panel-historical">
     <div class="section-label">Multi-Year Historical Analysis — Jan 2024 → Mar 2026</div>
     <div class="dashboard-grid">
       <div class="viz-card col-12">
         <div class="card-header">
           <div class="card-title-group">
-            <div class="card-title">Full 2-Year Temperature Record</div>
+            <div class="card-title">Full Temperature Record</div>
             <div class="card-subtitle">All readings · Jan 2024 – Mar 2026</div>
           </div>
           <div class="card-actions"><span class="card-tag tag-temp">Temp</span></div>
         </div>
         <div class="card-body">
-          <div class="chart-area" style="height:300px">
-            <div class='tableauPlaceholder' style='position:relative;width:100%;height:300px'>
-              <object class='tableauViz' style='display:none;'>
-                <param name='host_url' value='https%3A%2F%2Fpublic.tableau.com%2F' />
-                <param name='embed_code_version' value='3' />
-                <param name='site_root' value='' />
-                <param name='name' value='AllenDockData/TemperatureTrends' />
-                <param name='tabs' value='no' /><param name='toolbar' value='no' />
-                <param name='animate_transition' value='yes' />
-                <param name='display_static_image' value='yes' />
-              </object>
-            </div>
+          <div class="tableau-container" style="height:300px">
+            <div id="viz-hist-temp" class="viz-loading" style="height:300px">Loading...</div>
           </div>
         </div>
       </div>
@@ -938,18 +814,8 @@
           <div class="card-actions"><span class="card-tag tag-wind">Wind</span></div>
         </div>
         <div class="card-body">
-          <div class="chart-area" style="height:220px">
-            <div class='tableauPlaceholder' style='position:relative;width:100%;height:220px'>
-              <object class='tableauViz' style='display:none;'>
-                <param name='host_url' value='https%3A%2F%2Fpublic.tableau.com%2F' />
-                <param name='embed_code_version' value='3' />
-                <param name='site_root' value='' />
-                <param name='name' value='AllenDockData/AverageWindSpeeds' />
-                <param name='tabs' value='no' /><param name='toolbar' value='no' />
-                <param name='animate_transition' value='yes' />
-                <param name='display_static_image' value='yes' />
-              </object>
-            </div>
+          <div class="tableau-container" style="height:220px">
+            <div id="viz-hist-wind" class="viz-loading" style="height:220px">Loading...</div>
           </div>
         </div>
       </div>
@@ -962,49 +828,28 @@
           <div class="card-actions"><span class="card-tag tag-solar">Solar</span></div>
         </div>
         <div class="card-body">
-          <div class="chart-area" style="height:220px">
-            <div class='tableauPlaceholder' style='position:relative;width:100%;height:220px'>
-              <object class='tableauViz' style='display:none;'>
-                <param name='host_url' value='https%3A%2F%2Fpublic.tableau.com%2F' />
-                <param name='embed_code_version' value='3' />
-                <param name='site_root' value='' />
-                <param name='name' value='AllenDockData/SolarRadiation' />
-                <param name='tabs' value='no' /><param name='toolbar' value='no' />
-                <param name='animate_transition' value='yes' />
-                <param name='display_static_image' value='yes' />
-              </object>
-            </div>
+          <div class="tableau-container" style="height:220px">
+            <div id="viz-hist-solar" class="viz-loading" style="height:220px">Loading...</div>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- TAB 3: RESEARCH -->
   <div class="tab-panel" id="panel-research">
     <div class="section-label">Research Parameter Explorer</div>
     <div class="dashboard-grid">
       <div class="viz-card col-12">
         <div class="card-header">
           <div class="card-title-group">
-            <div class="card-title">Multi-Parameter Overlay</div>
-            <div class="card-subtitle">Jan 2024 – Mar 2026 · Monthly Resolution</div>
+            <div class="card-title">Full Dashboard</div>
+            <div class="card-subtitle">Jan 2024 – Mar 2026 · All Parameters</div>
           </div>
           <div class="card-actions"><span class="card-tag tag-temp">Research Mode</span></div>
         </div>
         <div class="card-body">
-          <div class="chart-area" style="height:350px">
-            <div class='tableauPlaceholder' style='position:relative;width:100%;height:350px'>
-              <object class='tableauViz' style='display:none;'>
-                <param name='host_url' value='https%3A%2F%2Fpublic.tableau.com%2F' />
-                <param name='embed_code_version' value='3' />
-                <param name='site_root' value='' />
-                <param name='name' value='AllenDockData/AllenDockData' />
-                <param name='tabs' value='no' /><param name='toolbar' value='no' />
-                <param name='animate_transition' value='yes' />
-                <param name='display_static_image' value='yes' />
-              </object>
-            </div>
+          <div class="tableau-container" style="height:500px">
+            <div id="viz-research" class="viz-loading" style="height:500px">Loading...</div>
           </div>
         </div>
       </div>
@@ -1014,16 +859,13 @@
 </div>
 </div>
 
-<!-- FOOTER -->
 <footer>
   <div class="footer-inner">
     <div class="footer-text">
       Allen Dock Environmental Research Station · Data via iChart6 · Updated continuously
     </div>
     <div class="footer-links">
-      <a href="#" class="footer-link">Download CSV</a>
-      <a href="#" class="footer-link">Station Info</a>
-      <a href="#" class="footer-link">Tableau Dashboard ↗</a>
+      <a href="https://public.tableau.com/app/profile/stephanie.drafahl2615/vizzes" class="footer-link" target="_blank">Tableau Dashboard ↗</a>
     </div>
   </div>
 </footer>
@@ -1048,22 +890,94 @@ function switchTab(tabId, btn) {
   btn.classList.add('active');
 }
 
-// ── FILTER CHIPS ──
-function setRange(range, btn) {
-  document.querySelectorAll('.filter-chips .chip').forEach(c => c.classList.remove('active'));
-  btn.classList.add('active');
-  const ranges = {
-    'today': 'Today',
-    '7d': 'Last 7 Days',
-    '30d': 'Last 30 Days',
-    '3m': 'Last 3 Months',
-    '1y': 'Last 1 Year',
-    'all': 'Jan 1, 2024 → Mar 31, 2026'
+// ── TABLEAU VIZ MANAGEMENT ──
+const BASE_URL = 'https://public.tableau.com/views/AllenDockData/';
+
+const vizConfigs = [
+  { id: 'viz-temp',       sheet: 'TemperatureTrends',   height: 240 },
+  { id: 'viz-wind-dir',   sheet: 'AverageWindDirection', height: 280 },
+  { id: 'viz-solar',      sheet: 'SolarRadiation',       height: 130 },
+  { id: 'viz-humidity',   sheet: 'Humidity',             height: 130 },
+  { id: 'viz-pressure',   sheet: 'BarometricPressure',   height: 130 },
+  { id: 'viz-wetbulb',    sheet: 'WetBulbTemperatures',  height: 130 },
+  { id: 'viz-wind-speed', sheet: 'AverageWindSpeeds',    height: 150 },
+  { id: 'viz-precip',     sheet: 'Precipitation',        height: 150 },
+  { id: 'viz-co2',        sheet: 'CO2',                  height: 150 },
+  { id: 'viz-max-wind',   sheet: 'MaximumWindSpeeds',    height: 150 },
+  { id: 'viz-hist-temp',  sheet: 'TemperatureTrends',    height: 300 },
+  { id: 'viz-hist-wind',  sheet: 'AverageWindSpeeds',    height: 220 },
+  { id: 'viz-hist-solar', sheet: 'SolarRadiation',       height: 220 },
+  { id: 'viz-research',   sheet: 'AllenDockData',        height: 500 },
+];
+
+const vizObjects = {};
+let currentDays = 30;
+
+function initViz(config) {
+  const container = document.getElementById(config.id);
+  if (!container) return;
+
+  const url = BASE_URL + config.sheet;
+  const options = {
+    hideTabs: true,
+    hideToolbar: true,
+    width: '100%',
+    height: config.height + 'px',
+    onFirstInteractive: function() {
+      applyDateFilter(config.id, currentDays);
+    }
   };
-  document.getElementById('dateRangeDisplay').textContent = '📅 ' + ranges[range];
+
+  try {
+    const viz = new tableau.Viz(container, url, options);
+    vizObjects[config.id] = viz;
+  } catch(e) {
+    container.innerHTML = '<div style="padding:12px;font-family:Space Mono,monospace;font-size:0.6rem;color:#3d5475;">Chart unavailable</div>';
+  }
 }
 
+function applyDateFilter(vizId, days) {
+  const viz = vizObjects[vizId];
+  if (!viz) return;
 
+  try {
+    const sheet = viz.getWorkbook().getActiveSheet();
+    if (days === 9999) {
+      sheet.clearFilterAsync('Date/Time');
+    } else {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(endDate.getDate() - days);
+      sheet.applyRangeFilterAsync('Date/Time', {
+        min: startDate,
+        max: endDate
+      });
+    }
+  } catch(e) {
+    // Some charts may not support date filtering
+  }
+}
+
+function setRange(days, btn) {
+  document.querySelectorAll('.filter-chips .chip').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  currentDays = days;
+
+  const labels = {
+    1: 'Today', 7: 'Last 7 Days', 30: 'Last 30 Days',
+    90: 'Last 3 Months', 365: 'Last Year', 9999: 'All Data'
+  };
+  document.getElementById('dateRangeDisplay').textContent = '📅 ' + labels[days];
+
+  Object.keys(vizObjects).forEach(id => applyDateFilter(id, days));
+}
+
+// Initialize vizzes on load
+window.addEventListener('load', function() {
+  vizConfigs.forEach(function(config, i) {
+    setTimeout(function() { initViz(config); }, i * 200);
+  });
+});
 </script>
 </body>
 </html>
