@@ -1231,28 +1231,6 @@ function renderFallback() {
 
 // Start loading data
 loadData();
-Chart.defaults.font.family = 'Space Mono';
-Chart.defaults.font.size = 10;
-
-const gridColor = 'rgba(56,130,220,0.08)';
-const baseOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: { legend: { display: false }, tooltip: {
-    backgroundColor: 'rgba(8,13,26,0.95)',
-    borderColor: 'rgba(56,130,220,0.3)',
-    borderWidth: 1,
-    titleFont: { family: 'Space Mono', size: 10 },
-    bodyFont: { family: 'Space Mono', size: 10 },
-    padding: 10
-  }},
-  scales: {
-    x: { grid: { color: gridColor }, ticks: { maxRotation: 45 } },
-    y: { grid: { color: gridColor } }
-  }
-};
-
-
 </script>
 </body>
 </html>
