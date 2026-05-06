@@ -944,11 +944,28 @@ function filterRecords(days) {
   return allRecords.filter(r => new Date(r['Date/Time']) >= cutoff);
 }
 
+// ── SANITY RANGES ──
+const sanityRanges = {
+  'AirTemp':       [-50, 60],   'Temp00': [-10, 40],
+  'Temp01':        [-10, 40],   'Temp02': [-10, 40],
+  'Temp':          [-10, 40],   'RH':     [0, 100],
+  'Rel. BP':       [900, 1100], 'WindSp': [0, 60],
+  'Max WindSp':    [0, 80],     'WindDir':[0, 360],
+  'Wet Bulb Temp': [-50, 50],   'SolarRad':[0, 1500],
+  'RainInten':     [0, 200],    'TotalRain':[0, 10000],
+  'CO2':           [300, 2000], 'Bat':    [0, 30],
+};
+
 // ── EXTRACT COLUMN DATA ──
 function extract(records, col) {
+  const range = sanityRanges[col];
   return records.map(r => {
     const v = r[col];
-    return (v === null || v === undefined || v === '') ? null : Number(v);
+    if (v === null || v === undefined || v === '') return null;
+    const num = Number(v);
+    if (isNaN(num)) return null;
+    if (range && (num < range[0] || num > range[1])) return null;
+    return num;
   });
 }
 
@@ -962,11 +979,28 @@ function extractLabels(records) {
 // ── UPDATE STAT BAR WITH LATEST VALUES ──
 function updateStatBar(records) {
   if (!records.length) return;
-  const latest = records[records.length - 1];
+  // Find latest record with valid AirTemp
+  let latest = null;
+  for (let i = records.length - 1; i >= 0; i--) {
+    const r = records[i];
+    const t = Number(r['AirTemp']);
+    if (!isNaN(t) && t > -50 && t < 60) { latest = r; break; }
+  }
+  if (!latest) latest = records[records.length - 1];
 
   const setVal = (id, val, unit) => {
     const el = document.getElementById(id);
-    if (el && val !== null) el.textContent = Number(val).toFixed(1) + unit;
+    if (!el || val === null || val === undefined) return;
+    const num = Number(val);
+    if (!isNaN(num)) el.textContent = num.toFixed(1) + unit;
+  };
+
+  // Also update the card stat values
+  const setCard = (selector, val, unit) => {
+    const el = document.querySelector(selector);
+    if (!el || val === null) return;
+    const num = Number(val);
+    if (!isNaN(num)) el.textContent = num.toFixed(1) + unit;
   };
 
   setVal('stat-airtemp', latest['AirTemp'], '°C');
@@ -1094,12 +1128,26 @@ function renderCharts(days) {
     borderDash: [5,3]
   }]});
 
-  // Precipitation
-  buildChart('precipChart', 'bar', { labels, datasets: [{
-    label: 'Rain Intensity (mm/h)', data: extract(records, 'RainInten'),
-    backgroundColor: 'rgba(125,211,252,0.5)',
-    borderColor: 'rgba(125,211,252,0.8)', borderWidth: 1, borderRadius: 2
-  }]});
+  // Precipitation — aggregate to daily totals for visibility
+  const dailyRain = {};
+  records.forEach(r => {
+    const day = r['Date/Time'] ? r['Date/Time'].substring(0, 10) : null;
+    if (!day) return;
+    const val = r['RainInten'];
+    if (val !== null && val !== undefined) {
+      dailyRain[day] = (dailyRain[day] || 0) + Number(val);
+    }
+  });
+  const rainDays = Object.keys(dailyRain).sort();
+  const rainVals = rainDays.map(d => Math.round(dailyRain[d] * 10) / 10);
+  buildChart('precipChart', 'bar', { 
+    labels: rainDays.map(d => { const dt = new Date(d); return dt.toLocaleDateString('en-US', {month:'short',day:'numeric'}); }),
+    datasets: [{
+      label: 'Daily Rain (mm)', data: rainVals,
+      backgroundColor: 'rgba(125,211,252,0.6)',
+      borderColor: 'rgba(125,211,252,0.9)', borderWidth: 1, borderRadius: 2
+    }]
+  }, { ...baseOptions, scales: { ...baseOptions.scales, y: { ...baseOptions.scales.y, min: 0 }}});
 
   // CO2
   buildChart('co2Chart', 'line', { labels, datasets: [{
