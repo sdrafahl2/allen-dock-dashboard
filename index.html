@@ -1267,7 +1267,7 @@ function renderCharts(days) {
 }
 
 // ── OVERRIDE SETRANGE TO ALSO UPDATE CHARTS ──
-const _origSetRange = setRange;
+// ── OVERRIDE SETRANGE TO ALSO UPDATE CHARTS ──
 // Redefine setRange to also trigger chart updates
 function setRange(range, btn) {
   document.querySelectorAll('.filter-chips .chip').forEach(c => c.classList.remove('active'));
@@ -1301,7 +1301,9 @@ async function loadData() {
 }
 
 function renderFallback() {
-  // Use static demo data as fallback when data.json isn't available yet
+  // Fallback not implemented - data loads from GitHub
+}
+
 // ── THEME TOGGLE ──
 let isDark = true;
 function toggleTheme() {
@@ -1354,12 +1356,14 @@ function downloadCSV(e) {
     return;
   }
 
- const attribution = [
-  '# Allen Dock Environmental Research Station',
-  '# Data collected and owned by Colby College',
-  `# Downloaded: ${new Date().toISOString().slice(0,10)}`,
-  '#'
-];
+  const attribution = [
+    '# Allen Dock Environmental Research Station',
+    '# Data collected and owned by Colby College',
+    '# Principal Investigator: D. Whitney King',
+    `# Downloaded: ${new Date().toISOString().slice(0,10)}`,
+    '# Contact: dwking@colby.edu',
+    '#'
+  ];
 
   const cols = ['Date/Time','AirTemp','Temp00','Temp01','Temp02',
                  'RH','Rel. BP','WindSp','Max WindSp','WindDir',
