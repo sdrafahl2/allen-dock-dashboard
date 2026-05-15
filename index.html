@@ -55,6 +55,31 @@
     background: radial-gradient(ellipse, rgba(100,150,255,0.15) 0%, transparent 70%);
   }
 
+  body.light-mode header {
+    background: linear-gradient(180deg, rgba(224,232,248,0.98) 0%, rgba(224,232,248,0.92) 100%);
+  }
+
+  body.light-mode .date-range-input {
+    background: rgba(200,212,238,0.8);
+    color: var(--text-secondary);
+    border-color: var(--border);
+  }
+
+  body.light-mode .chip.active {
+    background: rgba(26,127,212,0.15);
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+  }
+
+  body.light-mode .tab-btn.active {
+    color: var(--accent-cyan);
+    background: rgba(26,127,212,0.08);
+  }
+
+  body.light-mode .live-indicator {
+    background: rgba(45,164,78,0.1);
+  }
+
   /* ── FLOATING THEME BUTTON ── */
   .theme-toggle {
     position: fixed;
@@ -573,7 +598,7 @@
     <div class="filter-sep"></div>
     <div class="date-range-input" id="dateRangeDisplay">📅 Jan 1, 2024 → Mar 31, 2026</div>
     <div class="filter-sep"></div>
-    <button class="chip" id="unitToggle" onclick="toggleUnits(this)">°C · Metric</button>
+    <button class="chip active" id="unitToggle" onclick="toggleUnits(this)">°F · Imperial</button>
   </div>
 </div>
 
@@ -598,19 +623,19 @@
         <div class="card-body">
           <div class="chart-stat-row">
             <div class="chart-stat">
-              <div class="chart-stat-val" style="color:var(--accent-coral)">8.4°C</div>
+              <div class="chart-stat-val" style="color:var(--accent-coral)" id="card-airtemp">8.4°C</div>
               <div class="chart-stat-lbl">Air Temp Now</div>
             </div>
             <div class="chart-stat">
-              <div class="chart-stat-val" style="color:#fbbf24">7.1°C</div>
+              <div class="chart-stat-val" style="color:#fbbf24" id="card-temp00">7.1°C</div>
               <div class="chart-stat-lbl">Water Surface</div>
             </div>
             <div class="chart-stat">
-              <div class="chart-stat-val" style="color:#a78bfa">6.8°C</div>
+              <div class="chart-stat-val" style="color:#a78bfa" id="card-temp01">6.8°C</div>
               <div class="chart-stat-lbl">1m Depth</div>
             </div>
             <div class="chart-stat">
-              <div class="chart-stat-val" style="color:var(--accent-teal)">6.2°C</div>
+              <div class="chart-stat-val" style="color:var(--accent-teal)" id="card-temp02">6.2°C</div>
               <div class="chart-stat-lbl">2m Depth</div>
             </div>
           </div>
@@ -696,19 +721,19 @@
         <div class="card-header">
           <div class="card-title-group">
             <div class="card-title">Barometric Pressure</div>
-            <div class="card-subtitle">Avg hPa by Month</div>
+            <div class="card-subtitle" id="sub-pressure">Avg hPa by Month</div>
           </div>
           <div class="card-actions"><span class="card-tag tag-pressure">Pressure</span></div>
         </div>
         <div class="card-body">
           <div class="chart-stat-row">
             <div class="chart-stat">
-              <div class="chart-stat-val" style="color:var(--accent-green)">1013</div>
-              <div class="chart-stat-lbl">hPa Now</div>
+              <div class="chart-stat-val" style="color:var(--accent-green)" id="card-bp">1013</div>
+              <div class="chart-stat-lbl" id="card-bp-unit">hPa Now</div>
             </div>
             <div class="chart-stat">
-              <div class="chart-stat-val" style="color:var(--text-secondary)">1011</div>
-              <div class="chart-stat-lbl">30d Avg</div>
+              <div class="chart-stat-val" style="color:var(--text-secondary)" id="card-bp-avg">1011</div>
+              <div class="chart-stat-lbl" id="card-bp-avg-unit">30d Avg</div>
             </div>
           </div>
           <div class="chart-area" style="height:130px">
@@ -729,7 +754,7 @@
         <div class="card-body">
           <div class="chart-stat-row">
             <div class="chart-stat">
-              <div class="chart-stat-val" style="color:#fbbf24">6.1°C</div>
+              <div class="chart-stat-val" style="color:#fbbf24" id="card-wetbulb">6.1°C</div>
               <div class="chart-stat-lbl">WB Temp</div>
             </div>
             <div class="chart-stat">
@@ -755,12 +780,12 @@
         <div class="card-body">
           <div class="chart-stat-row">
             <div class="chart-stat">
-              <div class="chart-stat-val" style="color:var(--accent-cyan)">4.7</div>
-              <div class="chart-stat-lbl">Avg m/s</div>
+              <div class="chart-stat-val" style="color:var(--accent-cyan)" id="card-windsp">4.7</div>
+              <div class="chart-stat-lbl" id="card-windsp-unit">Avg m/s</div>
             </div>
             <div class="chart-stat">
-              <div class="chart-stat-val" style="color:#7dd3fc">11.2</div>
-              <div class="chart-stat-lbl">Max Gust</div>
+              <div class="chart-stat-val" style="color:#7dd3fc" id="card-maxwind">11.2</div>
+              <div class="chart-stat-lbl" id="card-maxwind-unit">Max Gust m/s</div>
             </div>
           </div>
           <div class="chart-area" style="height:150px">
@@ -935,7 +960,7 @@
     <div class="footer-links">
       <a href="#" class="footer-link">Download CSV</a>
       <a href="#" class="footer-link">Station Info</a>
-      <a href="#" class="footer-link">Tableau Dashboard ↗</a>
+
     </div>
   </div>
 </footer>
@@ -1026,10 +1051,32 @@ function extract(records, col) {
   });
 }
 
-function extractLabels(records) {
+function extractLabels(records, days) {
   return records.map(r => {
     const d = new Date(r['Date/Time']);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    if (days <= 1) {
+      // Today — show time only
+      return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    } else if (days <= 7) {
+      // 7 days — show date + time
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' +
+             d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    } else if (days <= 90) {
+      // 30 days / 3 months — show date only
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    } else {
+      // 1 year / all data — show month + year
+      return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+    }
+  });
+}
+
+// Full timestamp for tooltips
+function extractFullLabels(records) {
+  return records.map(r => {
+    const d = new Date(r['Date/Time']);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' +
+           d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
   });
 }
 
@@ -1066,6 +1113,24 @@ function updateStatBar(records) {
   setVal('stat-rh', latest['RH'], '%');
   setVal('stat-bp', toDisplay(latest['Rel. BP'], 'pressure'), ' ' + pressureUnit());
   setVal('stat-rain', latest['RainInten'], '');
+
+  // Update card stat values with latest data
+  setVal('card-airtemp', toDisplay(latest['AirTemp'], 'temp'), tempUnit());
+  setVal('card-temp00', toDisplay(latest['Temp00'], 'temp'), tempUnit());
+  setVal('card-temp01', toDisplay(latest['Temp01'], 'temp'), tempUnit());
+  setVal('card-temp02', toDisplay(latest['Temp02'], 'temp'), tempUnit());
+  setVal('card-wetbulb', toDisplay(latest['Wet Bulb Temp'], 'temp'), tempUnit());
+  setVal('card-bp', toDisplay(latest['Rel. BP'], 'pressure'), '');
+  setVal('card-windsp', toDisplay(latest['WindSp'], 'wind'), '');
+  setVal('card-maxwind', toDisplay(latest['Max WindSp'], 'wind'), '');
+
+  // Update unit labels
+  const setText = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+  setText('card-windsp-unit', 'Avg ' + windUnit());
+  setText('card-maxwind-unit', 'Max Gust ' + windUnit());
+  setText('card-bp-unit', pressureUnit() + ' Now');
+  setText('card-bp-avg-unit', '30d Avg ' + pressureUnit());
+  setText('sub-pressure', 'Avg ' + pressureUnit() + ' by Month');
 }
 
 // ── BUILD OR UPDATE A CHART ──
@@ -1093,8 +1158,23 @@ function renderCharts(days) {
   const records = filterRecords(days);
   if (!records.length) return;
 
-  const labels = extractLabels(records);
+  const labels = extractLabels(records, days);
+  const fullLabels = extractFullLabels(records);
   updateStatBar(records);
+
+  // Tooltip options with full timestamp
+  const tooltipWithTime = {
+    ...baseOptions,
+    plugins: {
+      ...baseOptions.plugins,
+      tooltip: {
+        ...baseOptions.plugins.tooltip,
+        callbacks: {
+          title: (items) => fullLabels[items[0].dataIndex] || items[0].label
+        }
+      }
+    }
+  };
 
   // Temperature Trends
   buildChart('tempChart', 'line', {
@@ -1110,7 +1190,7 @@ function renderCharts(days) {
       { label: `Water 2m (${tempUnit()})`, data: extract(records, 'Temp02').map(v => toDisplay(v, 'temp')),
         borderColor: '#00e5cc', borderWidth: 1.5, pointRadius: 0, tension: 0.4 }
     ]
-  }, { ...baseOptions, plugins: { ...baseOptions.plugins, legend: { display: true,
+  }, { ...tooltipWithTime, plugins: { ...tooltipWithTime.plugins, legend: { display: true,
     labels: { color: 'rgba(120,155,196,0.8)', font: { family: 'Space Mono', size: 9 }, boxWidth: 20 }
   }}});
 
@@ -1325,12 +1405,15 @@ function toggleTheme() {
 }
 
 // ── UNITS TOGGLE ──
-let isMetric = true;
+let isMetric = false;
 function toggleUnits(btn) {
   isMetric = !isMetric;
   btn.textContent = isMetric ? '°C · Metric' : '°F · Imperial';
   btn.classList.toggle('active', !isMetric);
-  if (allRecords.length) renderCharts(currentDays);
+  if (allRecords.length) {
+    renderCharts(currentDays);
+    updateStatBar(filterRecords(currentDays));
+  }
 }
 
 function toDisplay(val, type) {
@@ -1356,30 +1439,21 @@ function downloadCSV(e) {
     return;
   }
 
-  const attribution = [
-    '# Allen Dock Environmental Research Station',
-    '# Data collected and owned by Colby College',
-    `# Downloaded: ${new Date().toISOString().slice(0,10)}`,
-  ];
-
   const cols = ['Date/Time','AirTemp','Temp00','Temp01','Temp02',
                  'RH','Rel. BP','WindSp','Max WindSp','WindDir',
                  'Wet Bulb Temp','RainInten','TotalRain','SolarRad','CO2'];
 
-  const rows = [
-    ...attribution,
-    cols.join(',')
-  ];
+  const attribution = '# Allen Dock Environmental Research Station\n# Data collected and owned by Colby College\n# Downloaded: ' + new Date().toISOString().slice(0,10) + '\n#\n';
+  const header = cols.join(',');
+  const dataRows = allRecords.map(r =>
+    cols.map(c => { const v = r[c]; return (v !== null && v !== undefined) ? v : ''; }).join(',')
+  ).join('\n');
 
-  allRecords.forEach(r => {
-    rows.push(cols.map(c => r[c] !== null && r[c] !== undefined ? r[c] : '').join(','));
-  });
-
-  const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+  const blob = new Blob([attribution + header + '\n' + dataRows], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `allen_dock_data_${new Date().toISOString().slice(0,10)}.csv`;
+  a.download = 'allen_dock_data_' + new Date().toISOString().slice(0,10) + '.csv';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
