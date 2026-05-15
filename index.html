@@ -612,19 +612,19 @@
         <div class="card-body">
           <div class="chart-stat-row">
             <div class="chart-stat">
-              <div class="chart-stat-val" style="color:var(--accent-coral)">8.4°C</div>
+              <div class="chart-stat-val" style="color:var(--accent-coral)" id="card-airtemp">8.4°C</div>
               <div class="chart-stat-lbl">Air Temp Now</div>
             </div>
             <div class="chart-stat">
-              <div class="chart-stat-val" style="color:#fbbf24">7.1°C</div>
+              <div class="chart-stat-val" style="color:#fbbf24" id="card-temp00">7.1°C</div>
               <div class="chart-stat-lbl">Water Surface</div>
             </div>
             <div class="chart-stat">
-              <div class="chart-stat-val" style="color:#a78bfa">6.8°C</div>
+              <div class="chart-stat-val" style="color:#a78bfa" id="card-temp01">6.8°C</div>
               <div class="chart-stat-lbl">1m Depth</div>
             </div>
             <div class="chart-stat">
-              <div class="chart-stat-val" style="color:var(--accent-teal)">6.2°C</div>
+              <div class="chart-stat-val" style="color:var(--accent-teal)" id="card-temp02">6.2°C</div>
               <div class="chart-stat-lbl">2m Depth</div>
             </div>
           </div>
@@ -743,7 +743,7 @@
         <div class="card-body">
           <div class="chart-stat-row">
             <div class="chart-stat">
-              <div class="chart-stat-val" style="color:#fbbf24">6.1°C</div>
+              <div class="chart-stat-val" style="color:#fbbf24" id="card-wetbulb">6.1°C</div>
               <div class="chart-stat-lbl">WB Temp</div>
             </div>
             <div class="chart-stat">
@@ -1003,15 +1003,23 @@ const DATA_URL = 'https://raw.githubusercontent.com/sdrafahl2/allen-dock-dashboa
 
 // Store all records and chart instances
 let allRecords = [];
+let currentRecords = []; // always holds the currently filtered records
 const charts = {};
 let currentDays = 7;
 
 // ── FILTER DATA BY DATE RANGE ──
+function parseRecordDate(dtStr) {
+  if (!dtStr) return new Date(0);
+  // If no timezone info, treat as local time by replacing T with space
+  // This prevents UTC interpretation shifting the date
+  return new Date(dtStr.replace('T', ' '));
+}
+
 function filterRecords(days) {
   if (days === 9999) return allRecords;
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);
-  return allRecords.filter(r => new Date(r['Date/Time']) >= cutoff);
+  return allRecords.filter(r => parseRecordDate(r['Date/Time']) >= cutoff);
 }
 
 // ── SANITY RANGES ──
@@ -1042,7 +1050,7 @@ function extract(records, col) {
 function extractLabels(records, days) {
   days = days || 9999;
   return records.map(r => {
-    const d = new Date(r['Date/Time']);
+    const d = parseRecordDate(r['Date/Time']);
     if (days <= 1) {
       return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
     } else if (days <= 7) {
@@ -1058,7 +1066,7 @@ function extractLabels(records, days) {
 
 function extractFullLabels(records) {
   return records.map(r => {
-    const d = new Date(r['Date/Time']);
+    const d = parseRecordDate(r['Date/Time']);
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' +
            d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
   });
@@ -1097,6 +1105,13 @@ function updateStatBar(records) {
   setVal('stat-rh', latest['RH'], '%');
   setVal('stat-bp', toDisplay(latest['Rel. BP'], 'pressure'), ' ' + pressureUnit());
   setVal('stat-rain', latest['RainInten'], '');
+
+  // Update card stat values
+  setVal('card-airtemp', toDisplay(latest['AirTemp'], 'temp'), tempUnit());
+  setVal('card-temp00', toDisplay(latest['Temp00'], 'temp'), tempUnit());
+  setVal('card-temp01', toDisplay(latest['Temp01'], 'temp'), tempUnit());
+  setVal('card-temp02', toDisplay(latest['Temp02'], 'temp'), tempUnit());
+  setVal('card-wetbulb', toDisplay(latest['Wet Bulb Temp'], 'temp'), tempUnit());
 }
 
 // ── BUILD OR UPDATE A CHART ──
@@ -1109,10 +1124,10 @@ function buildChart(id, type, datasets, options) {
     charts[id].data.datasets.forEach((ds, i) => {
       if (datasets.datasets[i]) {
         ds.data = datasets.datasets[i].data;
-        if (datasets.datasets[i].label) ds.label = datasets.datasets[i].label;
+        if (datasets.datasets[i].label !== undefined) ds.label = datasets.datasets[i].label;
       }
     });
-    charts[id].update('none');
+    charts[id].update(); // full update so legend labels refresh
   } else {
     charts[id] = new Chart(canvas, {
       type: type,
@@ -1126,6 +1141,7 @@ function buildChart(id, type, datasets, options) {
 function renderCharts(days) {
   const records = filterRecords(days);
   if (!records.length) return;
+  currentRecords = records; // store for tooltip access
 
   const labels = extractLabels(records, days);
   const fullLabels = extractFullLabels(records);
@@ -1141,7 +1157,16 @@ function renderCharts(days) {
       ...baseOptions.plugins,
       tooltip: {
         ...baseOptions.plugins.tooltip,
-        callbacks: { title: items => fullLabels[items[0].dataIndex] || items[0].label }
+        callbacks: {
+          title: items => {
+            const idx = items[0].dataIndex;
+            const r = currentRecords[idx];
+            if (!r) return items[0].label;
+            const d = parseRecordDate(r['Date/Time']);
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' +
+                   d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+          }
+        }
       }
     },
     scales: {
@@ -1168,8 +1193,8 @@ function renderCharts(days) {
     labels: { color: 'rgba(120,155,196,0.8)', font: { family: 'Space Mono', size: 9 }, boxWidth: 20 }
   }}});
 
-  // Wind Rose
-  const windDirs = allRecords.map(r => r['WindDir']).filter(v => v !== null);
+  // Wind Rose — filtered to current date range
+  const windDirs = records.map(r => r['WindDir']).filter(v => v !== null && v !== undefined);
   const dirBins = { 'N':0,'NNE':0,'NE':0,'ENE':0,'E':0,'ESE':0,'SE':0,'SSE':0,
                     'S':0,'SSW':0,'SW':0,'WSW':0,'W':0,'WNW':0,'NW':0,'NNW':0 };
   const dirNames = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
@@ -1257,19 +1282,54 @@ function renderCharts(days) {
   }]}, { ...tw, scales: { ...tw.scales, y: { ...tw.scales.y, min: 390, max: 440 }}});
 
   // ── HISTORICAL CHARTS — use ALL records, month+year labels ──
-  const allLabels = extractLabels(allRecords, 9999);
+  // Generate one label per unique month for clean axis
   const allFullLabels = extractFullLabels(allRecords);
+  const allLabels = allRecords.map(r => {
+    const d = parseRecordDate(r['Date/Time']);
+    return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+  });
+
+  // Find indices of first record of each month for tick positions
+  const seenMonths = new Set();
+  const monthTickIndices = [];
+  allRecords.forEach((r, i) => {
+    const d = parseRecordDate(r['Date/Time']);
+    const key = d.getFullYear() + '-' + d.getMonth();
+    if (!seenMonths.has(key)) {
+      seenMonths.add(key);
+      monthTickIndices.push(i);
+    }
+  });
+
   const htw = {
     ...baseOptions,
     plugins: {
       ...baseOptions.plugins,
       tooltip: {
         ...baseOptions.plugins.tooltip,
-        callbacks: { title: items => allFullLabels[items[0].dataIndex] || items[0].label }
+        callbacks: {
+          title: items => {
+            const idx = items[0].dataIndex;
+            const r = allRecords[idx];
+            if (!r) return items[0].label;
+            const d = parseRecordDate(r['Date/Time']);
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' +
+                   d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+          }
+        }
       }
     },
     scales: {
-      x: { grid: { color: gridColor }, ticks: { maxRotation: 45, maxTicksLimit: 30, autoSkip: true } },
+      x: { 
+        grid: { color: gridColor }, 
+        ticks: { 
+          maxRotation: 45,
+          autoSkip: false,
+          callback: function(val, index) {
+            return monthTickIndices.includes(index) ? allLabels[index] : '';
+          }
+        }
+      },
       y: { grid: { color: gridColor } }
     }
   };
@@ -1316,10 +1376,26 @@ function renderCharts(days) {
     plugins: { legend: { display: true,
       labels: { color: 'rgba(120,155,196,0.8)', font: { family: 'Space Mono', size: 9 }, boxWidth: 20 }
     }, tooltip: { ...baseOptions.plugins.tooltip,
-      callbacks: { title: items => allFullLabels[items[0].dataIndex] || items[0].label }
+      callbacks: { title: items => {
+        const idx = items[0].dataIndex;
+        const r = allRecords[idx];
+        if (!r) return items[0].label;
+        const d = parseRecordDate(r['Date/Time']);
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' +
+               d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      }}
     }},
     scales: {
-      x: { grid: { color: gridColor }, ticks: { maxRotation: 45, maxTicksLimit: 30, autoSkip: true } },
+      x: { 
+        grid: { color: gridColor }, 
+        ticks: { 
+          maxRotation: 45,
+          autoSkip: false,
+          callback: function(val, index) {
+            return monthTickIndices.includes(index) ? allLabels[index] : '';
+          }
+        }
+      },
       y: { grid: { color: gridColor }, position: 'left' },
       y1: { grid: { display: false }, position: 'right', min: 40, max: 100 }
     }
